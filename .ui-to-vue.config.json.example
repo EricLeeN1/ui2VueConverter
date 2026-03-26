@@ -1,0 +1,14 @@
+{
+  "inputDir": "./screenshots",
+  "uiLibrary": "vant",
+  "outputDir": "./src",
+  "apiKey": "your-dashscope-api-key",
+  "generateRouter": true,
+  "autoFormat": true,
+  "customComponents": [
+    "Header",
+    "Footer",
+    "SearchBar",
+    "ConfirmModal"
+  ]
+}
