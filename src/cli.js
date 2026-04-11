@@ -25,6 +25,12 @@ program
     const pageGroups = await scanner.scan();
     console.log(`✅ 识别到 ${pageGroups.length} 个页面组`);
 
+    // 显示切图统计
+    const totalCutImages = pageGroups.reduce((sum, p) => sum + (p.cutImages?.length || 0), 0);
+    if (totalCutImages > 0) {
+      console.log(`✅ 识别到 ${totalCutImages} 个设计切图/素材`);
+    }
+
     // 2. UI库适配
     const uiAdapter = new UiLibraryAdapter(options.ui);
     const uiConfig = uiAdapter.getConfig();

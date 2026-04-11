@@ -12,6 +12,7 @@
 - ✅ 批量扫描设计图目录，自动识别页面和页面的不同状态
 - ✅ 支持选择UI库：移动端Vant、PC端Element Plus、Ant Design Vue
 - ✅ 自动识别并抽离公共组件，减少重复代码
+- ✅ **支持设计切图/素材，生成更精准的UI还原**
 - ✅ 生成符合规范的Vue 3 Composition API代码
 - ✅ 自动生成路由配置
 - ✅ 生成代码自动格式化
@@ -22,7 +23,7 @@
 ```bash
 # 克隆项目
 git clone https://github.com/EricLeeN1/ui2VueConverter.git
-cd ui-to-vue-converter
+cd ui2VueConverter
 
 # 安装依赖
 npm install
@@ -66,6 +67,96 @@ ui-to-vue --input ./designs --output ./src
 ui-to-vue --input /Users/your-username/common-designs --output /Users/your-username/project/src
 ```
 
+## 🖼️ 设计切图/素材支持
+
+为了提高生成代码的UI还原度，本工具支持识别设计切图（图标、按钮、标签等独立元素），并将切图素材传给AI模型分析，使生成的代码更精准地还原图标样式、颜色和尺寸。
+
+### 为什么需要切图？
+
+| 有切图 | 无切图 |
+|--------|--------|
+| 图标/按钮样式准确 | 可能使用默认组件图标 |
+| 颜色值更精确 | 颜色可能不够准确 |
+| 间距/尺寸更准确 | 尺寸可能偏差 |
+| 自定义元素还原度高 | 自定义元素可能被误解 |
+
+### 切图目录结构
+
+```
+screenshots/
+├── 签收登记/                      # 页面目录
+│   ├── 签收登记-待签收@3x.png      # 页面截图
+│   ├── 签收登记-详情@3x.png
+│   ├── 签收登记-已签收@3x.png
+│   └── 切图/                      # 页面专属切图 ⭐
+│       ├── icon-back.png          # 返回箭头
+│       ├── icon-search.png        # 搜索图标
+│       ├── btn-primary.png        # 主按钮
+│       ├── btn-secondary.png      # 次按钮
+│       ├── tag-urgent.png         # 紧急标签
+│       ├── badge-new.png          # 新消息徽章
+│       └── ...
+│
+├── 收文办理/
+│   ├── 收文办理-列表@3x.png
+│   ├── 切图/
+│   │   └── ...
+│
+├── 切图/                          # 全局切图（所有页面共用） ⭐
+│   ├── logo.png                   # Logo
+│   ├── icon-home.png              # 首页图标
+│   ├── icon-user.png              # 用户图标
+│   ├── avatar-default.png         # 默认头像
+│   └── ...
+│
+└── index.html                     # 预览页面（可选）
+```
+
+### 切图命名建议
+
+为了更好地识别切图类型，建议使用以下命名规范：
+
+| 前缀 | 类型 | 示例 |
+|------|------|------|
+| `icon-` | 图标 | `icon-back.png`, `icon-search.png` |
+| `btn-` / `button-` | 按钮 | `btn-primary.png`, `btn-submit.png` |
+| `logo` | Logo | `logo.png`, `logo-dark.png` |
+| `tab-` | 标签页 | `tab-active.png`, `tab-inactive.png` |
+| `badge-` | 徽章 | `badge-new.png`, `badge-count.png` |
+| `tag-` | 标记 | `tag-urgent.png`, `tag-status.png` |
+| `arrow-` | 箭头 | `arrow-left.png`, `arrow-right.png` |
+| `bg-` | 背景 | `bg-header.png`, `bg-card.png` |
+| `avatar-` | 头像 | `avatar-default.png`, `avatar-small.png` |
+
+### 支持的切图目录名称
+
+工具会自动识别以下目录作为切图目录：
+- `切图` (中文)
+- `assets`
+- `icons`
+- `sprites`
+- `cut`
+- `images`
+
+### 切图格式支持
+
+- PNG（推荐）
+- JPG/JPEG
+- SVG
+
+### 使用切图的生成效果
+
+```bash
+# 运行生成命令，工具会自动识别切图目录
+node src/cli.js --input ./screenshots --ui vant --output ./src
+
+# 输出示例：
+# ✅ 识别到 5 个页面组
+# ✅ 识别到 12 个设计切图/素材  ← 切图已被识别
+# ✅ 加载Vant UI库配置
+# 正在生成页面: 签收登记
+```
+
 ## 📄 License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
@@ -81,4 +172,3 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 ---
 
 **本项目与阿里巴巴/通义千问无官方关联，仅使用其公开API服务。**
-

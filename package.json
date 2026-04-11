@@ -1,6 +1,6 @@
 {
   "name": "ui-to-vue-converter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "UI设计图批量转Vue组件工具，支持多UI库，自动抽离公共组件",
   "type": "module",
   "main": "src/cli.js",
@@ -12,14 +12,25 @@
     "test": "node test/generate-test.js"
   },
   "dependencies": {
-    "@alicloud/dashscope": "^1.0.0",
     "commander": "^12.0.0",
+    "dashscope": "^1.0.1",
+    "dashscope-node": "^0.2.2",
     "fs-extra": "^11.2.0",
     "glob": "^10.3.0",
-    "sharp": "^0.33.0",
-    "prettier": "^3.2.0"
+    "prettier": "^3.2.0",
+    "sharp": "^0.33.0"
   },
-  "keywords": ["ui", "vue", "code-generation", "qwen-vl", "vant", "element-plus", "antd-vue", "claude-code", "openclaw"],
+  "keywords": [
+    "ui",
+    "vue",
+    "code-generation",
+    "qwen-vl",
+    "vant",
+    "element-plus",
+    "antd-vue",
+    "claude-code",
+    "openclaw"
+  ],
   "author": "",
   "license": "MIT",
   "repository": {
