@@ -1,0 +1,22 @@
+{
+  "name": "ui-to-vue-marketplace",
+  "owner": {
+    "name": "EricLeeN1",
+    "email": "179310009@qq.com"
+  },
+  "metadata": {
+    "description": "UI design to Vue component conversion tools",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ui-to-vue",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/EricLeeN1/ui2VueConverter.git"
+      },
+      "description": "Convert UI design screenshots (蓝湖/Figma/etc) to Vue 3 components with Vant/Element Plus/AntD Vue support",
+      "version": "1.0.3"
+    }
+  ]
+}
