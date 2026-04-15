@@ -44,7 +44,7 @@ export class CodeGenerator {
       await fs.writeFile(outputPath, code, 'utf8');
 
       // 生成路由配置
-      const routePath = `/${page.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      const routePath = page.routePath || `/${page.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
       routes.push({
         path: routePath,
         name: page.name,

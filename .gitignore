@@ -29,3 +29,12 @@ Thumbs.db
 temp/
 tmp/
 *.tmp
+
+screenshots/
+
+# 生成的 Vue 文件（由工具生成，不提交）
+src/views/
+src/router/
+src/components/
+src/App.vue
+src/main.js

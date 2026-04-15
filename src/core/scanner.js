@@ -15,101 +15,153 @@ export class Scanner {
       ignore: ['**/.DS_Store']
     });
 
-    // 按目录分组
+    // 按二级目录分组（一级目录/二级目录 = 一个页面）
     const groups = {};
+    const cutDirs = ['切图', 'assets', 'icons', 'sprites', 'cut', 'images'];
 
     for (const file of imageFiles) {
       const relativePath = path.relative(this.inputDir, file);
       const parts = relativePath.split(path.sep);
 
-      // 检查是否是切图目录（切图、assets、icons、sprites 等）
-      const cutDirs = ['切图', 'assets', 'icons', 'sprites', 'cut', 'images'];
-      const isCutImage = parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part));
-
-      if (isCutImage) {
-        // 切图不作为页面处理，跳过
+      // 跳过切图目录
+      if (parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part))) {
         continue;
       }
 
-      // 页面名称取目录名 + 文件名前缀（去掉状态后缀）
-      let pageName;
-      if (parts.length > 1) {
-        // 有子目录，以子目录名为页面组
-        pageName = parts[0];
+      // 二级目录结构：一级目录/二级目录/图片
+      // 一级目录 = 业务模块（如签收登记）
+      // 二级目录 = 页面类型（如列表、详情、退回）
+      let moduleName, pageType;
+
+      if (parts.length >= 3) {
+        // 有二级目录
+        moduleName = parts[0];
+        pageType = parts[1];
+      } else if (parts.length === 2) {
+        // 只有一级目录，视为单页面模块
+        moduleName = parts[0];
+        pageType = 'index';
       } else {
-        // 根目录下的文件，取文件名前缀
-        pageName = path.basename(file, path.extname(file)).split(/[-_]/)[0];
+        // 根目录图片
+        moduleName = path.basename(file, path.extname(file)).split(/[-_@]/)[0];
+        pageType = 'index';
       }
 
-      // 识别状态
+      // 页面唯一标识：模块名-页面类型
+      const pageKey = `${moduleName}-${pageType}`;
+      const pageName = `${moduleName}${pageType !== 'index' ? pageType : ''}`;
+
+      // 识别状态和倍数
       const fileName = path.basename(file, path.extname(file));
       const state = this.detectState(fileName);
+      const scale = this.detectScale(fileName);
 
-      if (!groups[pageName]) {
-        groups[pageName] = {
+      if (!groups[pageKey]) {
+        groups[pageKey] = {
           name: pageName,
+          moduleName,
+          pageType,
           componentName: this.toPascalCase(pageName) + '.vue',
+          routePath: this.generateRoutePath(moduleName, pageType),
           states: [],
-          cutImages: [] // 新增：存储切图
+          cutImages: [],
+          designWidth: 375  // 默认设计稿宽度
         };
       }
 
-      groups[pageName].states.push({
+      groups[pageKey].states.push({
         file,
         state,
+        scale,
         description: fileName
       });
     }
 
-    // 为每个页面组查找对应的切图
-    for (const pageName of Object.keys(groups)) {
-      groups[pageName].cutImages = await this.findCutImages(pageName);
+    // 为每个页面查找切图
+    for (const pageKey of Object.keys(groups)) {
+      const group = groups[pageKey];
+      group.cutImages = await this.findCutImages(group.moduleName, group.pageType);
     }
 
     return Object.values(groups);
   }
 
+  // 生成路由路径
+  generateRoutePath(moduleName, pageType) {
+    const baseRoute = '/' + moduleName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    if (pageType === 'index' || pageType === '列表') {
+      return baseRoute;
+    }
+    return baseRoute + '/' + pageType.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  }
+
   // 查找页面组对应的切图
-  async findCutImages(pageName) {
+  async findCutImages(moduleName, pageType) {
     const cutDirs = ['切图', 'assets', 'icons', 'sprites', 'cut', 'images'];
-    const cutImages = [];
+    const cutImagesMap = new Map();  // 用Map去重，保留最高倍数
 
     for (const cutDir of cutDirs) {
-      // 检查页面目录下的切图子目录
-      const cutPath = path.join(this.inputDir, pageName, cutDir);
-      if (fs.existsSync(cutPath)) {
-        const files = await glob('*.{png,jpg,jpeg,svg}', {
-          cwd: cutPath,
-          absolute: true
-        });
-        for (const file of files) {
-          cutImages.push({
-            file,
-            name: path.basename(file, path.extname(file)),
-            type: this.detectCutType(path.basename(file))
-          });
-        }
+      // 页面级切图：模块/页面类型/切图/
+      const pageCutPath = path.join(this.inputDir, moduleName, pageType, cutDir);
+      if (fs.existsSync(pageCutPath)) {
+        await this.scanCutDir(pageCutPath, cutImagesMap, 'page');
       }
 
-      // 检查根目录下的切图目录（全局切图）
+      // 模块级切图：模块/切图/
+      const moduleCutPath = path.join(this.inputDir, moduleName, cutDir);
+      if (fs.existsSync(moduleCutPath)) {
+        await this.scanCutDir(moduleCutPath, cutImagesMap, 'module');
+      }
+
+      // 全局切图：根目录/切图/
       const globalCutPath = path.join(this.inputDir, cutDir);
       if (fs.existsSync(globalCutPath)) {
-        const files = await glob('*.{png,jpg,jpeg,svg}', {
-          cwd: globalCutPath,
-          absolute: true
-        });
-        for (const file of files) {
-          cutImages.push({
-            file,
-            name: path.basename(file, path.extname(file)),
-            type: this.detectCutType(path.basename(file)),
-            global: true // 标记为全局切图
-          });
-        }
+        await this.scanCutDir(globalCutPath, cutImagesMap, 'global');
       }
     }
 
-    return cutImages;
+    return Array.from(cutImagesMap.values());
+  }
+
+  // 扫描切图目录，去重并保留最高倍数
+  async scanCutDir(dirPath, cutImagesMap, scope) {
+    const files = await glob('*.{png,jpg,jpeg,svg}', {
+      cwd: dirPath,
+      absolute: true
+    });
+
+    for (const file of files) {
+      const fullName = path.basename(file, path.extname(file));
+      const scale = this.detectScale(fullName);
+      // 去掉倍数后缀得到基础名称
+      const baseName = fullName.replace(/@\d+x$/i, '');
+
+      // 检查是否已有同名切图
+      const existing = cutImagesMap.get(baseName);
+      if (existing) {
+        // 已存在，比较倍数，保留更高的
+        if (scale > existing.scale) {
+          cutImagesMap.set(baseName, {
+            file,
+            name: baseName,
+            fullName,
+            scale,
+            type: this.detectCutType(baseName),
+            scope
+          });
+        }
+      } else {
+        // 新切图
+        cutImagesMap.set(baseName, {
+          file,
+          name: baseName,
+          fullName,
+          scale,
+          type: this.detectCutType(baseName),
+          scope
+        });
+      }
+    }
   }
 
   // 识别切图类型
@@ -128,13 +180,25 @@ export class Scanner {
 
   detectState(fileName) {
     const lowerName = fileName.toLowerCase();
-    if (lowerName.includes('list') || lowerName.includes('首页')) return 'list';
+    // 先识别特殊状态
+    if (lowerName.includes('空') || lowerName.includes('无数据') || lowerName.includes('empty')) return 'empty';
+    if (lowerName.includes('加载') || lowerName.includes('loading') || lowerName.includes('骨架')) return 'loading';
+    if (lowerName.includes('错误') || lowerName.includes('error') || lowerName.includes('失败')) return 'error';
+    // 页面类型
+    if (lowerName.includes('list') || lowerName.includes('列表') || lowerName.includes('首页')) return 'list';
     if (lowerName.includes('detail') || lowerName.includes('详情')) return 'detail';
     if (lowerName.includes('form') || lowerName.includes('编辑') || lowerName.includes('新建')) return 'form';
-    if (lowerName.includes('modal') || lowerName.includes('弹窗') || lowerName.includes('确认')) return 'modal';
     if (lowerName.includes('success') || lowerName.includes('成功')) return 'success';
-    if (lowerName.includes('error') || lowerName.includes('失败')) return 'error';
     return 'default';
+  }
+
+  // 识别图片倍数
+  detectScale(fileName) {
+    const match = fileName.match(/@(\d+)x$/i);
+    if (match) {
+      return parseInt(match[1]);
+    }
+    return 1;  // 无倍数标记默认为 1x
   }
 
   toPascalCase(str) {
