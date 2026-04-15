@@ -6,6 +6,7 @@ pnpm-lock.yaml
 
 # 配置文件（包含敏感信息）
 .ui-to-vue.config.json
+ui-to-vue.config.json
 .env
 .env.local
 .env.*.local

@@ -1,5 +1,7 @@
 # UI 设计图转 Vue 组件工具
 
+[English](README_EN.md) | 中文
+
 [![GitHub license](https://img.shields.io/github/license/EricLeeN1/ui2VueConverter)](https://github.com/EricLeeN1/ui2VueConverter/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/EricLeeN1/ui2VueConverter)](https://github.com/EricLeeN1/ui2VueConverter/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/EricLeeN1/ui2VueConverter)](https://github.com/EricLeeN1/ui2VueConverter/issues)
@@ -181,6 +183,27 @@ node src/cli.js --input ./screenshots --ui vant --output ./src
 # ✅ 识别到 12 个设计切图/素材  ← 切图已被识别
 # ✅ 加载Vant UI库配置
 # 正在生成页面: 首页
+```
+
+## API 密钥配置
+
+优先级：`--config` > `.ui-to-vue.config.json` > `DASHSCOPE_API_KEY` 环境变量
+
+```json
+// .ui-to-vue.config.json
+{
+  "apiKey": "your_dashscope_key",
+  "input": "./designs",
+  "ui": "vant",
+  "output": "./src"
+}
+```
+
+**⚠️ 安全警告**：请将 `.ui-to-vue.config.json` 添加到 `.gitignore`，防止 API 密钥意外泄露到版本控制中。
+
+```gitignore
+# .gitignore
+.ui-to-vue.config.json
 ```
 
 ## 📄 License
