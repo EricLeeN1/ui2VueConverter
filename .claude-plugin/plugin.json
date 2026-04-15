@@ -1,0 +1,22 @@
+{
+  "name": "ui-to-vue",
+  "description": "Convert UI design screenshots (蓝湖/Figma/etc) to Vue 3 components with Vant/Element Plus/AntD Vue support",
+  "version": "1.0.2",
+  "author": {
+    "name": "EricLeeN1",
+    "email": "179310009@qq.com"
+  },
+  "homepage": "https://github.com/EricLeeN1/ui2VueConverter",
+  "repository": "https://github.com/EricLeeN1/ui2VueConverter",
+  "license": "MIT",
+  "keywords": [
+    "ui-to-code",
+    "vue",
+    "vant",
+    "element-plus",
+    "antd-vue",
+    "design-conversion",
+    "蓝湖",
+    "figma"
+  ]
+}
