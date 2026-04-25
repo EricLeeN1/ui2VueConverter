@@ -45,6 +45,9 @@ export class ApiClient {
     const imageContents = [];
     const targetWidth = isMobile ? 800 : 1500;
 
+    // 获取设计图实际像素宽度（由 Scanner 自动检测）
+    const actualImageWidth = pageGroup.actualImageWidth;
+
     for (const state of pageGroup.states) {
       const scale = state.scale || 1;
       const compressedBuffer = await sharp(state.file)
@@ -104,9 +107,6 @@ export class ApiClient {
         });
       }
     }
-
-    // 获取设计图实际像素宽度（由 Scanner 自动检测）
-    const actualImageWidth = pageGroup.actualImageWidth;
 
     // 获取图片倍数标记（如 @3x），用于计算设计稿实际标注宽度
     const imageScale = pageGroup.states[0]?.scale || 1;
