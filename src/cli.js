@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Command } from 'commander';
 import { Scanner } from './core/scanner.js';
 import { CodeGenerator } from './core/code-generator.js';
@@ -6,12 +9,16 @@ import { UiLibraryAdapter } from './core/ui-library-adapter.js';
 import { ComponentExtractor } from './core/component-extractor.js';
 import { PresetConfig } from './core/preset-config.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
+
 const program = new Command();
 
 program
   .name('ui-to-vue')
   .description('UI设计图批量转Vue组件工具')
-  .version('1.0.5')
+  .version(pkg.version)
   .option('--input <path>', '设计图目录路径', './screenshots')
   .option('--ui <library>', 'UI库选择: vant/element-plus/antd-vue', 'vant')
   .option('--output <path>', '输出目录', './src')
