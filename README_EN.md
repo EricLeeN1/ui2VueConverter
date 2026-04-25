@@ -12,12 +12,17 @@ One-click batch conversion of UI design screenshots (LanHu, Figma, etc.) to Vue 
 ## Features
 
 - ✅ Batch scan design directories, auto-detect pages and different states
+- ✅ **Smart directory structure detection** — auto-detect module/page hierarchy
 - ✅ UI library options: Vant (mobile), Element Plus, Ant Design Vue (PC)
 - ✅ Auto-detect and extract public components, reduce duplicate code
 - ✅ **Support design cut images/assets for more accurate UI restoration**
 - ✅ Generate Vue 3 Composition API compliant code
 - ✅ **Support Preset configuration for project-specific output standards**
-- ✅ Auto-generate router configuration
+- ✅ **Multi API Provider support** — Anthropic, DashScope, OpenAI, etc.
+- ✅ **Auto router injection** — append routes to existing router file
+- ✅ CSS syntax error auto-fix
+- ✅ Design image size auto-detection (@1x/@2x/@3x)
+- ✅ Redundant import auto-cleanup
 - ✅ Auto-format generated code
 
 ## Quick Start
@@ -67,8 +72,9 @@ claude plugin install ui-to-vue@ui-to-vue-marketplace
 | `--output` | Output directory | `./src` |
 | `--config` | Config file path | `./.ui-to-vue.config.json` |
 | `--preset` | Configuration preset | `default` |
+| `--inject-router` | Auto inject routes to project router file, e.g. `src/router/index.ts` | - |
 
-## Preset Configuration (New in v1.1.0)
+## Preset Configuration
 
 The tool supports customizing project standards via `.ui-to-vue.config.json` configuration file, without modifying the tool source code.
 
@@ -80,12 +86,21 @@ The tool supports customizing project standards via `.ui-to-vue.config.json` con
   "useTypeScript": true,
   "styleLang": "scss",
   "useUnoCSS": false,
-  "designWidth": 750,
+  "designWidth": 375,
+  "projectStandardWidth": 750,
   "rootValue": 75,
   "layoutComponent": "BasePages",
   "componentImportMode": "auto",
   "fileNaming": "kebab",
   "outputStructure": "flat",
+  "provider": "anthropic",
+  "url": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
+  "apiKey": "your_api_key",
+  "model": "qwen3.6-plus",
+  "toast": "custom",
+  "customToastCall": "toast.show(\"{message}\")",
+  "confirm": "custom",
+  "customConfirmCall": "dialog.confirm(\"{title}\", \"{message}\")",
   "customImports": [
     "import toast from '@/utils/toast'",
     "import dialog from '@/utils/dialog'"
@@ -94,8 +109,7 @@ The tool supports customizing project standards via `.ui-to-vue.config.json` con
     "Project uses TypeScript, `<script setup lang=\"ts\">`",
     "Styles use SCSS (`<style scoped lang=\"scss\">`), do not use UnoCSS atomic classes",
     "All dimensions use px unit, design draft baseline 750px",
-    "Layout wrapped uniformly with BasePages component",
-    "toast uses `toast.show(\"message\")`"
+    "Layout wrapped uniformly with BasePages component"
   ],
   "nameMap": {
     "Example Page": "example-page",
@@ -112,10 +126,17 @@ The tool supports customizing project standards via `.ui-to-vue.config.json` con
 | `styleLang` | string | Style language: `css`/`scss`/`less` |
 | `useUnoCSS` | boolean | Use UnoCSS atomic classes |
 | `designWidth` | number | Design draft baseline width (e.g. 375/750) |
+| `projectStandardWidth` | number | Project design standard width (e.g. 750px), for size conversion |
 | `rootValue` | number | postcss-pxtorem rootValue |
 | `layoutComponent` | string | Layout component name, e.g. `BasePages` |
 | `fileNaming` | string | File naming style: `pascal` or `kebab` |
 | `outputStructure` | string | Output structure: `nested` or `flat` |
+| `provider` | string | API Provider: `anthropic`/`dashscope`/`openai` |
+| `url` | string | Custom API URL |
+| `apiKey` | string | API key |
+| `model` | string | Model name |
+| `toast` | string | Toast type: `van`/`el`/`antd`/`custom`/`none` |
+| `confirm` | string | Confirm type: `van`/`el`/`antd`/`custom`/`none` |
 | `customImports` | string[] | Additional import modules |
 | `customPromptRules` | string[] | Custom AI Prompt rules |
 | `nameMap` | object | Map Chinese directory names to English |
@@ -276,17 +297,27 @@ node src/cli.js --input ./screenshots --ui vant --output ./src
 
 **Note**: Export design images at corresponding width baseline for accurate size conversion.
 
-## API Key Configuration
+## API Configuration
 
-Priority: `--config` > `.ui-to-vue.config.json` > `DASHSCOPE_API_KEY` environment variable
+Supports multiple LLM Providers: Anthropic Messages API (DashScope Coding Plan, etc.), OpenAI Chat Completions API.
+
+Priority: `--config` > `.ui-to-vue.config.json` > environment variable
 
 ```json
-// .ui-to-vue.config.json
+// .ui-to-vue.config.json — DashScope (default)
 {
-  "apiKey": "your_dashscope_key",
-  "input": "./designs",
-  "ui": "vant",
-  "output": "./src"
+  "provider": "anthropic",
+  "url": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
+  "apiKey": "your_api_key",
+  "model": "qwen3.6-plus"
+}
+
+// .ui-to-vue.config.json — OpenAI
+{
+  "provider": "openai",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "apiKey": "your_openai_key",
+  "model": "gpt-4o"
 }
 ```
 

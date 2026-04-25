@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import { Scanner } from './core/scanner.js';
 import { CodeGenerator } from './core/code-generator.js';

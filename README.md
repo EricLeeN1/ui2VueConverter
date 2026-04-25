@@ -12,12 +12,17 @@
 ## 功能特性
 
 - ✅ 批量扫描设计图目录，自动识别页面和页面的不同状态
+- ✅ **智能目录结构识别** — 自动探测模块/页面层级
 - ✅ 支持选择UI库：移动端Vant、PC端Element Plus、Ant Design Vue
 - ✅ 自动识别并抽离公共组件，减少重复代码
 - ✅ **支持设计切图/素材，生成更精准的UI还原**
 - ✅ 生成符合规范的Vue 3 Composition API代码
 - ✅ **支持 Preset 预设配置，可按项目自定义输出规范**
-- ✅ 自动生成路由配置
+- ✅ **多 API Provider 支持** — Anthropic、DashScope、OpenAI 等
+- ✅ **路由自动注入** — 自动追加到项目路由文件
+- ✅ CSS 语法错误自动修复
+- ✅ 设计稿尺寸自动识别（@1x/@2x/@3x）
+- ✅ 冗余导入自动清理
 - ✅ 生成代码自动格式化
 
 ## 快速开始
@@ -56,8 +61,9 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
 - `--output`: 输出目录，默认`./src`
 - `--config`: 配置文件路径，默认`./.ui-to-vue.config.json`
 - `--preset`: 配置预设，默认`default`
+- `--inject-router`: 自动注入路由到项目路由文件，如 `src/router/index.ts`
 
-## Preset 预设配置（新功能 v1.1.0）
+## Preset 预设配置
 
 工具支持通过 `.ui-to-vue.config.json` 配置文件自定义项目规范，无需修改工具源码。
 
@@ -69,12 +75,21 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
   "useTypeScript": true,
   "styleLang": "scss",
   "useUnoCSS": false,
-  "designWidth": 750,
+  "designWidth": 375,
+  "projectStandardWidth": 750,
   "rootValue": 75,
   "layoutComponent": "BasePages",
   "componentImportMode": "auto",
   "fileNaming": "kebab",
   "outputStructure": "flat",
+  "provider": "anthropic",
+  "url": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
+  "apiKey": "your_api_key",
+  "model": "qwen3.6-plus",
+  "toast": "custom",
+  "customToastCall": "toast.show(\"{message}\")",
+  "confirm": "custom",
+  "customConfirmCall": "dialog.confirm(\"{title}\", \"{message}\")",
   "customImports": [
     "import toast from '@/utils/toast'",
     "import dialog from '@/utils/dialog'"
@@ -83,8 +98,7 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
     "项目使用 TypeScript，`<script setup lang=\"ts\">`",
     "样式使用 SCSS（`<style scoped lang=\"scss\">`），不使用 UnoCSS 原子类",
     "所有尺寸使用 px 单位，设计稿基准 750px",
-    "布局统一使用 BasePages 组件包裹",
-    "toast 使用 `toast.show(\"消息\")`"
+    "布局统一使用 BasePages 组件包裹"
   ],
   "nameMap": {
     "示例页面": "example-page",
@@ -101,10 +115,17 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
 | `styleLang` | string | 样式语言：`css`/`scss`/`less` |
 | `useUnoCSS` | boolean | 是否使用 UnoCSS 原子类 |
 | `designWidth` | number | 设计稿基准宽度（如 375/750） |
+| `projectStandardWidth` | number | 项目设计标准宽度（如 750px），用于尺寸转换 |
 | `rootValue` | number | postcss-pxtorem 的 rootValue |
 | `layoutComponent` | string | 布局组件名，如 `BasePages` |
 | `fileNaming` | string | 文件名风格：`pascal` 或 `kebab` |
 | `outputStructure` | string | 输出结构：`nested` 或 `flat` |
+| `provider` | string | API Provider：`anthropic`/`dashscope`/`openai` |
+| `url` | string | 自定义 API 地址 |
+| `apiKey` | string | API 密钥 |
+| `model` | string | 模型名称 |
+| `toast` | string | toast 类型：`van`/`el`/`antd`/`custom`/`none` |
+| `confirm` | string | confirm 类型：`van`/`el`/`antd`/`custom`/`none` |
 | `customImports` | string[] | 额外导入的模块 |
 | `customPromptRules` | string[] | 自定义 AI Prompt 规则 |
 | `nameMap` | object | 中文目录名映射为英文 |
@@ -253,17 +274,27 @@ node src/cli.js --input ./screenshots --ui vant --output ./src
 # 正在生成页面: 首页
 ```
 
-## API 密钥配置
+## API 配置
 
-优先级：`--config` > `.ui-to-vue.config.json` > `DASHSCOPE_API_KEY` 环境变量
+支持多种 LLM Provider：Anthropic Messages API（DashScope Coding Plan 等）、OpenAI Chat Completions API。
+
+优先级：`--config` > `.ui-to-vue.config.json` > 环境变量
 
 ```json
-// .ui-to-vue.config.json
+// .ui-to-vue.config.json — DashScope (默认)
 {
-  "apiKey": "your_dashscope_key",
-  "input": "./designs",
-  "ui": "vant",
-  "output": "./src"
+  "provider": "anthropic",
+  "url": "https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages",
+  "apiKey": "your_api_key",
+  "model": "qwen3.6-plus"
+}
+
+// .ui-to-vue.config.json — OpenAI
+{
+  "provider": "openai",
+  "url": "https://api.openai.com/v1/chat/completions",
+  "apiKey": "your_openai_key",
+  "model": "gpt-4o"
 }
 ```
 
