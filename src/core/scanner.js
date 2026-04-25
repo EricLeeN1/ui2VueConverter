@@ -1,6 +1,7 @@
 import { glob } from 'glob';
 import path from 'path';
 import fs from 'fs-extra';
+import sharp from 'sharp';
 
 export class Scanner {
   constructor(inputDir, presetConfig = null) {
@@ -84,6 +85,26 @@ export class Scanner {
     for (const pageKey of Object.keys(groups)) {
       const group = groups[pageKey];
       group.cutImages = await this.findCutImages(group.moduleName, group.pageType);
+    }
+
+    // 自动检测设计图实际像素宽度
+    const firstDesignImage = imageFiles.find(file => {
+      const relativePath = path.relative(this.inputDir, file);
+      const parts = relativePath.split(path.sep);
+      return !parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part));
+    });
+
+    if (firstDesignImage) {
+      try {
+        const metadata = await sharp(firstDesignImage).metadata();
+        const actualWidth = metadata.width;
+        for (const group of Object.values(groups)) {
+          group.actualImageWidth = actualWidth;
+        }
+        console.log(`📐 检测到设计图实际宽度: ${actualWidth}px`);
+      } catch (e) {
+        // 忽略读取失败，继续使用配置文件的 designWidth
+      }
     }
 
     return Object.values(groups);

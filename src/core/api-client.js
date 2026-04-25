@@ -52,9 +52,10 @@ export class ApiClient {
           data: base64
         }
       });
+      const widthInfo = actualImageWidth ? `，图片实际宽度：${actualImageWidth}px` : '';
       imageContents.push({
         type: 'text',
-        text: `【页面状态】${state.state}，说明：${state.description}，原图倍数：@${scale}x，设计稿基准：${designWidth}px`
+        text: `【页面状态】${state.state}，说明：${state.description}，原图倍数：@${scale}x，设计稿基准：${designWidth}px${widthInfo}`
       });
     }
 
@@ -95,8 +96,11 @@ export class ApiClient {
       }
     }
 
+    // 获取设计图实际像素宽度（由 Scanner 自动检测）
+    const actualImageWidth = pageGroup.actualImageWidth;
+
     // 构建提示词
-    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0);
+    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0, actualImageWidth);
 
     const content = [
       { type: 'text', text: prompt },
@@ -118,7 +122,7 @@ export class ApiClient {
     return codeMatch ? codeMatch[1].trim() : resultText;
   }
 
-  buildPrompt(uiConfig, designWidth, hasCutImages) {
+  buildPrompt(uiConfig, designWidth, hasCutImages, actualImageWidth = null) {
     const presetCfg = this.preset.get();
     const customRules = this.preset.getPromptRules();
 
@@ -145,6 +149,12 @@ export class ApiClient {
 - @3x 图片：图片尺寸÷3 = 实际设计尺寸
 
 当前项目设计稿基准：**${designWidth}px**`;
+
+    // 自动计算并注入 px 倍数规则
+    const pxScaleRule = this.buildPxScaleRule(actualImageWidth, presetCfg.rootValue, customRules);
+    if (pxScaleRule) {
+      prompt += `\n\n## 尺寸转换规则（重要）\n${pxScaleRule}`;
+    }
 
     // 根据 preset 添加项目特定规范
     if (presetCfg.useTypeScript) {
@@ -238,6 +248,38 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
 - 生成的代码应该是可直接用于生产环境的`;
 
     return prompt;
+  }
+
+  /**
+   * 构建 px 尺寸转换规则
+   * 根据设计图实际宽度和项目 rootValue 自动计算倍数
+   * @param {number|null} actualImageWidth - 图片实际像素宽度
+   * @param {number} rootValue - postcss-pxtorem 的 rootValue
+   * @param {string[]} customRules - 已有的自定义规则（用于去重检测）
+   * @returns {string|null} 转换规则文本，无需转换时返回 null
+   */
+  buildPxScaleRule(actualImageWidth, rootValue, customRules = []) {
+    if (!actualImageWidth || !rootValue || rootValue <= 0) return null;
+
+    // 项目设计标准宽度 = rootValue * 10（amfe-flexible 设 html font-size = deviceWidth/10）
+    const projectStandard = rootValue * 10;
+    const scale = projectStandard / actualImageWidth;
+
+    // 无需转换的情况（倍数接近 1）
+    if (Math.abs(scale - 1) < 0.05) return null;
+
+    // 检查 customRules 中是否已有类似规则（避免重复注入）
+    const hasExistingRule = customRules.some(rule => {
+      const lower = rule.toLowerCase();
+      return lower.includes('乘以') || lower.includes('pxtorem') ||
+             lower.includes('designwidth') || lower.includes('rootvalue') ||
+             lower.includes('设计稿') || lower.includes('rootValue');
+    });
+    if (hasExistingRule) return null;
+
+    const scaleText = scale % 1 === 0 ? String(scale) : scale.toFixed(2);
+
+    return `设计图实际宽度为 ${actualImageWidth}px，但项目使用 ${projectStandard}px 设计稿标准（postcss-pxtorem rootValue: ${rootValue}）。请将所有视觉测量的尺寸（width、height、padding、margin、font-size、line-height、border-radius、gap 等）乘以 ${scaleText} 后再输出 px 值，例如图片上测量为 100px 的元素，代码中写 ${Math.round(100 * scale)}px`;
   }
 
   async callClaudeAPI(content) {
