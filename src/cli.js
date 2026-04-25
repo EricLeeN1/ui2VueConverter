@@ -23,7 +23,7 @@ program
   .option('--ui <library>', 'UI库选择: vant/element-plus/antd-vue', 'vant')
   .option('--output <path>', '输出目录', './src')
   .option('--config <path>', '配置文件路径')
-  .option('--preset <name>', '配置预设: default/gtzw-h5', 'default')
+  .option('--preset <name>', '配置预设: default/custom', 'default')
   .option('--inject-router <path>', '自动注入路由到项目路由文件（如 src/router/index.ts）')
   .action(async (options) => {
     console.log('🚀 开始生成Vue组件...');
