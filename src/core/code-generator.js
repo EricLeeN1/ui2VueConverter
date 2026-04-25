@@ -45,13 +45,17 @@ export class CodeGenerator {
       // 调整 script/style 标签
       code = this.adjustTags(code);
 
-      // 格式化代码
-      code = await prettier.format(code, {
-        parser: 'vue',
-        semi: false,
-        singleQuote: true,
-        trailingComma: 'none'
-      });
+      // 格式化代码（出错时跳过）
+      try {
+        code = await prettier.format(code, {
+          parser: 'vue',
+          semi: false,
+          singleQuote: true,
+          trailingComma: 'none'
+        });
+      } catch (fmtErr) {
+        console.warn(`⚠️ 格式化失败，保存原始代码: ${fmtErr.message}`);
+      }
 
       // 保存文件（使用 preset 的命名规则）
       const fileName = this.presetConfig.getFileName(page.name);
