@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/cli.js",
   "bin": {
-    "ui-to-vue": "./src/cli.js"
+    "ui-to-vue": "src/cli.js"
   },
   "scripts": {
     "generate": "node src/cli.js",
@@ -50,7 +50,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/EricLeeN1/ui2VueConverter.git"
+    "url": "git+https://github.com/EricLeeN1/ui2VueConverter.git"
   },
   "bugs": {
     "url": "https://github.com/EricLeeN1/ui2VueConverter/issues"
