@@ -1,6 +1,6 @@
 {
   "name": "ui-to-vue-converter",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "UI设计图批量转Vue组件工具，支持多UI库，自动抽离公共组件",
   "type": "module",
   "main": "src/cli.js",
