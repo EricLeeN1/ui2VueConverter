@@ -3,8 +3,9 @@ import path from 'path';
 import fs from 'fs-extra';
 
 export class Scanner {
-  constructor(inputDir) {
+  constructor(inputDir, presetConfig = null) {
     this.inputDir = inputDir;
+    this.presetConfig = presetConfig;
   }
 
   async scan() {
@@ -48,8 +49,10 @@ export class Scanner {
       }
 
       // 页面唯一标识：模块名-页面类型
-      const pageKey = `${moduleName}-${pageType}`;
-      const pageName = `${moduleName}${pageType !== 'index' ? pageType : ''}`;
+      const moduleNameEn = this.mapName(moduleName);
+      const pageTypeEn = this.mapName(pageType);
+      const pageKey = `${moduleNameEn}-${pageTypeEn}`;
+      const pageName = `${moduleNameEn}${pageTypeEn !== 'index' ? '-' + pageTypeEn : ''}`;
 
       // 识别状态和倍数
       const fileName = path.basename(file, path.extname(file));
@@ -61,11 +64,11 @@ export class Scanner {
           name: pageName,
           moduleName,
           pageType,
-          componentName: this.toPascalCase(pageName) + '.vue',
+          componentName: this.getComponentName(pageName),
           routePath: this.generateRoutePath(moduleName, pageType),
           states: [],
           cutImages: [],
-          designWidth: 375  // 默认设计稿宽度
+          designWidth: this.presetConfig ? this.presetConfig.getDesignWidth() : 375
         };
       }
 
@@ -86,13 +89,30 @@ export class Scanner {
     return Object.values(groups);
   }
 
+  // 名称映射：中文目录名 -> 英文
+  mapName(name) {
+    if (!this.presetConfig) return name;
+    const nameMap = this.presetConfig.get().nameMap || {};
+    return nameMap[name] || name;
+  }
+
+  // 根据 preset 生成文件名
+  getComponentName(pageName) {
+    if (this.presetConfig) {
+      return this.presetConfig.getFileName(pageName);
+    }
+    return this.toPascalCase(pageName) + '.vue';
+  }
+
   // 生成路由路径
   generateRoutePath(moduleName, pageType) {
-    const baseRoute = '/' + moduleName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    if (pageType === 'index' || pageType === '列表') {
+    const moduleNameEn = this.mapName(moduleName);
+    const pageTypeEn = this.mapName(pageType);
+    const baseRoute = '/' + this.toKebabCase(moduleNameEn);
+    if (pageTypeEn === 'index' || pageTypeEn === '列表') {
       return baseRoute;
     }
-    return baseRoute + '/' + pageType.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    return baseRoute + '/' + this.toKebabCase(pageTypeEn);
   }
 
   // 查找页面组对应的切图
@@ -203,5 +223,14 @@ export class Scanner {
 
   toPascalCase(str) {
     return str.replace(/(^|[-_/\. ])(\w)/g, (_, __, c) => c.toUpperCase()).replace(/[-_/\. ]/g, '');
+  }
+
+  toKebabCase(str) {
+    return str
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .replace(/[_\s]+/g, '-')
+      .replace(/[^a-zA-Z0-9\u4e00-\u9fa5-]/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
   }
 }

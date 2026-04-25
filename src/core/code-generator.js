@@ -8,17 +8,28 @@ export class CodeGenerator {
     this.outputDir = options.outputDir;
     this.uiConfig = options.uiConfig;
     this.commonComponents = options.commonComponents;
-    this.apiClient = new ApiClient();
+    this.presetConfig = options.presetConfig;
+    this.preset = this.presetConfig.get();
+    this.apiClient = new ApiClient(null, this.presetConfig);
   }
 
   async generate(pageGroups) {
-    // 创建输出目录结构
-    await fs.ensureDir(path.join(this.outputDir, 'views'));
-    await fs.ensureDir(path.join(this.outputDir, 'components'));
-    await fs.ensureDir(path.join(this.outputDir, 'router'));
+    // 输出结构：flat 模式不创建 views/ 子目录，nested 模式创建
+    const viewsDir = this.preset.outputStructure === 'flat'
+      ? this.outputDir
+      : path.join(this.outputDir, 'views');
+    await fs.ensureDir(viewsDir);
 
-    // 生成公共组件
-    await this.generateCommonComponents();
+    // 只在 nested 模式下创建 components 和 router
+    if (this.preset.outputStructure !== 'flat') {
+      await fs.ensureDir(path.join(this.outputDir, 'components'));
+      await fs.ensureDir(path.join(this.outputDir, 'router'));
+    }
+
+    // 生成公共组件（只在 nested 模式）
+    if (this.preset.outputStructure !== 'flat') {
+      await this.generateCommonComponents();
+    }
 
     // 生成页面组件
     const routes = [];
@@ -28,8 +39,11 @@ export class CodeGenerator {
       // 调用AI API生成代码
       let code = await this.apiClient.generateVueCode(page, this.uiConfig);
 
-      // 注入UI库和公共组件导入
+      // 注入导入
       code = this.injectImports(code);
+
+      // 调整 script/style 标签
+      code = this.adjustTags(code);
 
       // 格式化代码
       code = await prettier.format(code, {
@@ -39,22 +53,32 @@ export class CodeGenerator {
         trailingComma: 'none'
       });
 
-      // 保存文件
-      const outputPath = path.join(this.outputDir, 'views', page.componentName);
+      // 保存文件（使用 preset 的命名规则）
+      const fileName = this.presetConfig.getFileName(page.name);
+      const outputPath = path.join(viewsDir, fileName);
       await fs.writeFile(outputPath, code, 'utf8');
 
-      // 生成路由配置
-      const routePath = page.routePath || `/${page.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      // 收集路由信息
       routes.push({
-        path: routePath,
-        name: page.name,
-        component: `() => import('@/views/${page.componentName}')`,
+        path: page.routePath || `/${this.presetConfig.toKebabCase(page.name)}`,
+        name: this.presetConfig.toPascalCase(page.name),
+        component: fileName,
         meta: { title: page.name }
       });
     }
 
-    // 生成路由文件
-    await this.generateRouterFile(routes);
+    // 只在 nested 模式下生成独立路由文件
+    if (this.preset.outputStructure !== 'flat') {
+      await this.generateRouterFile(routes);
+    }
+
+    // 打印路由信息供用户手动注册
+    if (routes.length > 0) {
+      console.log('\n📋 生成的路由信息（请手动注册到项目路由文件）：');
+      for (const route of routes) {
+        console.log(`  { path: '${route.path}', name: '${route.name}', component: () => import('@/views/${route.component}') }`);
+      }
+    }
   }
 
   async generateCommonComponents() {
@@ -66,7 +90,10 @@ export class CodeGenerator {
   }
 
   getComponentTemplate(component) {
-    return `<script setup>
+    const scriptTag = this.presetConfig.getScriptTag();
+    const styleTag = this.presetConfig.getStyleTag();
+
+    return `${scriptTag}
 // ${component.name} 公共组件
 const props = defineProps({
   // 组件属性定义
@@ -82,7 +109,7 @@ const emit = defineEmits([])
   </div>
 </template>
 
-<style scoped>
+${styleTag}
 /* 组件样式 */
 .${component.name.toLowerCase()} {
 }
@@ -91,21 +118,42 @@ const emit = defineEmits([])
   }
 
   injectImports(code) {
-    let importStatements = '';
+    const imports = [];
 
-    // 添加UI库导入
-    importStatements += `${this.uiConfig.import}\n`;
-
-    // 添加公共组件导入
-    if (this.commonComponents.length > 0) {
-      importStatements += this.commonComponents.map(comp =>
-        `import ${comp.name} from '@/components/${comp.fileName}'`
-      ).join('\n') + '\n';
+    // 自定义导入（如 toast、dialog）
+    if (this.preset.customImports && this.preset.customImports.length > 0) {
+      imports.push(...this.preset.customImports);
     }
 
-    // 注入到script setup开头
-    return code.replace('<script setup>', `<script setup>
-${importStatements}`);
+    // 公共组件导入
+    if (this.commonComponents.length > 0 && this.preset.outputStructure !== 'flat') {
+      for (const comp of this.commonComponents) {
+        imports.push(`import ${comp.name} from '@/components/${comp.fileName}'`);
+      }
+    }
+
+    if (imports.length === 0) return code;
+
+    const importBlock = imports.join('\n') + '\n';
+
+    // 注入到 script setup 开头
+    const scriptRegex = /(<script setup(?:\s+lang="ts")?>)/;
+    return code.replace(scriptRegex, `$1\n${importBlock}`);
+  }
+
+  adjustTags(code) {
+    // 替换 script setup 标签
+    const scriptTag = this.presetConfig.getScriptTag();
+    code = code.replace(/<script setup>/, scriptTag);
+    code = code.replace(/<script setup lang="ts">/, scriptTag);
+
+    // 替换 style scoped 标签
+    const styleTag = this.presetConfig.getStyleTag();
+    code = code.replace(/<style scoped>/, styleTag);
+    code = code.replace(/<style scoped lang="scss">/, styleTag);
+    code = code.replace(/<style scoped lang="css">/, styleTag);
+
+    return code;
   }
 
   async generateRouterFile(routes) {
