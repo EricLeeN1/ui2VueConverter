@@ -16,12 +16,16 @@ program
   .option('--output <path>', '输出目录', './src')
   .option('--config <path>', '配置文件路径')
   .option('--preset <name>', '配置预设: default/gtzw-h5', 'default')
+  .option('--inject-router <path>', '自动注入路由到项目路由文件（如 src/router/index.ts）')
   .action(async (options) => {
     console.log('🚀 开始生成Vue组件...');
     console.log(`📁 设计图目录: ${options.input}`);
     console.log(`🎨 UI库: ${options.ui}`);
     console.log(`📤 输出目录: ${options.output}`);
     console.log(`⚙️ 配置预设: ${options.preset}`);
+    if (options.injectRouter) {
+      console.log(`🔗 路由注入: ${options.injectRouter}`);
+    }
 
     // 0. 加载 Preset 配置
     const presetConfig = new PresetConfig(options.preset, options.config);
@@ -59,7 +63,7 @@ program
       commonComponents,
       presetConfig
     });
-    await generator.generate(pageGroups);
+    await generator.generate(pageGroups, options.injectRouter);
     console.log('🎉 代码生成完成！');
   });
 

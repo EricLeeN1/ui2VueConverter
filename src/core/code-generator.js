@@ -14,7 +14,7 @@ export class CodeGenerator {
     this.apiClient = new ApiClient(null, this.presetConfig);
   }
 
-  async generate(pageGroups) {
+  async generate(pageGroups, injectRouterPath = null) {
     // 输出结构：flat 模式不创建 views/ 子目录，nested 模式创建
     const viewsDir = this.preset.outputStructure === 'flat'
       ? this.outputDir
@@ -93,6 +93,11 @@ export class CodeGenerator {
       for (const route of routes) {
         console.log(`  { path: '${route.path}', name: '${route.name}', component: () => import('@/views/${route.component}') }`);
       }
+    }
+
+    // 自动注入路由到项目路由文件
+    if (injectRouterPath && routes.length > 0) {
+      await this.injectRouter(routes, injectRouterPath);
     }
   }
 
@@ -281,5 +286,100 @@ export default router
     });
 
     await fs.writeFile(path.join(this.outputDir, 'router', 'index.js'), formattedCode, 'utf8');
+  }
+
+  /**
+   * 将生成的路由注入到现有路由文件
+   * @param {Array} routes - 新生成的路由列表
+   * @param {string} routerFilePath - 目标路由文件路径（相对于项目根目录）
+   */
+  async injectRouter(routes, routerFilePath) {
+    const projectRoot = this.findProjectRoot(this.outputDir);
+    if (!projectRoot) {
+      console.warn('⚠️ 未找到项目根目录（缺少 package.json），跳过路由注入');
+      return;
+    }
+
+    const fullPath = path.resolve(projectRoot, routerFilePath);
+    if (!fs.existsSync(fullPath)) {
+      console.warn(`⚠️ 路由文件不存在: ${fullPath}`);
+      return;
+    }
+
+    let content = fs.readFileSync(fullPath, 'utf8');
+
+    // 找到 const routes = [ ... ] 的范围
+    const routesMatch = content.match(/const routes\s*(?::\s*[A-Za-z<>\[\]|&_]+)?\s*=\s*\[/);
+    if (!routesMatch) {
+      console.warn('⚠️ 在路由文件中找不到 routes 数组定义，跳过注入');
+      return;
+    }
+
+    const arrayStart = routesMatch.index + routesMatch[0].length;
+
+    // 找匹配的 ]
+    let bracketCount = 1;
+    let arrayEnd = arrayStart;
+    for (let i = arrayStart; i < content.length; i++) {
+      if (content[i] === '[') bracketCount++;
+      if (content[i] === ']') bracketCount--;
+      if (bracketCount === 0) {
+        arrayEnd = i;
+        break;
+      }
+    }
+
+    const existingContent = content.slice(arrayStart, arrayEnd);
+
+    // 检测重复 path / name
+    const existingPaths = [];
+    const existingNames = [];
+    const pathMatches = existingContent.matchAll(/path\s*:\s*['"`]([^'"`]+)['"`]/g);
+    const nameMatches = existingContent.matchAll(/name\s*:\s*['"`]([^'"`]+)['"`]/g);
+    for (const m of pathMatches) existingPaths.push(m[1]);
+    for (const m of nameMatches) existingNames.push(m[1]);
+
+    const duplicates = [];
+    const newRoutes = [];
+    for (const route of routes) {
+      if (existingPaths.includes(route.path)) {
+        duplicates.push(`path: "${route.path}"`);
+        continue;
+      }
+      if (existingNames.includes(route.name)) {
+        duplicates.push(`name: "${route.name}"`);
+        continue;
+      }
+      newRoutes.push(route);
+    }
+
+    if (duplicates.length > 0) {
+      console.warn(`⚠️ 以下路由已存在，已跳过：\n  ${duplicates.join('\n  ')}`);
+    }
+
+    if (newRoutes.length === 0) {
+      console.log('📋 没有新路由需要注入');
+      return;
+    }
+
+    // 构建要插入的路由代码
+    const routeCode = newRoutes.map(route =>
+`  {
+    path: '${route.path}',
+    name: '${route.name}',
+    component: () => import('@/views/${route.component}'),
+    meta: ${JSON.stringify(route.meta)}
+  }`
+    ).join(',\n');
+
+    // 在 ] 前插入（如果数组已有内容，先加逗号）
+    const hasExistingRoutes = existingContent.trim().length > 0;
+    const insertCode = hasExistingRoutes ? ',\n' + routeCode : routeCode;
+
+    content = content.slice(0, arrayEnd) + insertCode + content.slice(arrayEnd);
+
+    // 写入文件
+    fs.writeFileSync(fullPath, content, 'utf8');
+    console.log(`✅ 已注入 ${newRoutes.length} 条路由到 ${routerFilePath}`);
   }
 }

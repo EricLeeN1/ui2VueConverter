@@ -11,40 +11,57 @@ export class Scanner {
 
   async scan() {
     // 查找所有图片文件
-    const imageFiles = await glob('**/*.{png,jpg,jpeg}', {
+    const allImageFiles = await glob('**/*.{png,jpg,jpeg}', {
       cwd: this.inputDir,
       absolute: true,
       ignore: ['**/.DS_Store']
     });
 
-    // 按二级目录分组（一级目录/二级目录 = 一个页面）
-    const groups = {};
     const cutDirs = ['切图', 'assets', 'icons', 'sprites', 'cut', 'images'];
 
-    for (const file of imageFiles) {
+    // 排除切图目录后的设计图
+    const designImages = allImageFiles.filter(file => {
+      const relativePath = path.relative(this.inputDir, file);
+      const parts = relativePath.split(path.sep);
+      return !parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part));
+    });
+
+    // 探测目录结构
+    const structure = this.detectStructure(designImages, cutDirs);
+    if (structure.type === 'root-files' && designImages.length > 1) {
+      console.warn(`⚠️ 警告: 检测到 ${designImages.length} 个图片直接放在根目录，将分别生成为独立页面`);
+    }
+    if (structure.type === 'module-dir') {
+      console.log(`📁 检测到模块目录结构: ${structure.moduleName}/*`);
+    }
+
+    // 按结构分组
+    const groups = {};
+
+    for (const file of designImages) {
       const relativePath = path.relative(this.inputDir, file);
       const parts = relativePath.split(path.sep);
 
-      // 跳过切图目录
-      if (parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part))) {
-        continue;
-      }
-
-      // 二级目录结构：一级目录/二级目录/图片
-      // 一级目录 = 业务模块（如首页、订单）
-      // 二级目录 = 页面类型（如列表、详情、退回）
       let moduleName, pageType;
 
-      if (parts.length >= 3) {
-        // 有二级目录
+      if (structure.type === 'module-dir') {
+        // inputDir 本身是模块，子目录是页面
+        moduleName = structure.moduleName;
+        pageType = parts[0]; // 子目录名
+      } else if (structure.type === 'root-files') {
+        // 根目录图片，每个文件独立成页
+        moduleName = path.basename(file, path.extname(file)).split(/[-_@]/)[0];
+        pageType = 'index';
+      } else if (parts.length >= 3) {
+        // 有二级目录: module/page/image
         moduleName = parts[0];
         pageType = parts[1];
       } else if (parts.length === 2) {
-        // 只有一级目录，视为单页面模块
+        // 只有一级目录: module/image
         moduleName = parts[0];
         pageType = 'index';
       } else {
-        // 根目录图片
+        // 单文件
         moduleName = path.basename(file, path.extname(file)).split(/[-_@]/)[0];
         pageType = 'index';
       }
@@ -88,7 +105,7 @@ export class Scanner {
     }
 
     // 自动检测设计图实际像素宽度
-    const firstDesignImage = imageFiles.find(file => {
+    const firstDesignImage = allImageFiles.find(file => {
       const relativePath = path.relative(this.inputDir, file);
       const parts = relativePath.split(path.sep);
       return !parts.some(part => cutDirs.includes(part.toLowerCase()) || cutDirs.includes(part));
@@ -108,6 +125,62 @@ export class Scanner {
     }
 
     return Object.values(groups);
+  }
+
+  /**
+   * 探测目录结构类型
+   * @param {string[]} designImages - 设计图绝对路径列表（已排除切图）
+   * @param {string[]} cutDirs - 切图目录名列表
+   * @returns {object} { type: 'nested'|'module-dir'|'root-files', moduleName? }
+   *
+   * 探测规则：
+   * - nested:      inputDir 下既有目录也有深层结构（module/page/image）
+   * - module-dir:  inputDir 下全是子目录，子目录下直接是图片 → inputDir 本身是模块
+   * - root-files:  inputDir 下直接是图片文件
+   */
+  detectStructure(designImages, cutDirs) {
+    if (designImages.length === 0) {
+      return { type: 'unknown' };
+    }
+
+    // 收集所有相对路径
+    const relativePaths = designImages.map(f => path.relative(this.inputDir, f));
+
+    // 按第一级分组
+    const firstLevelMap = new Map(); // dirName -> { isDir, hasSubDir }
+    for (const relPath of relativePaths) {
+      const parts = relPath.split(path.sep);
+      const first = parts[0];
+
+      if (!firstLevelMap.has(first)) {
+        firstLevelMap.set(first, { isDir: parts.length > 1, hasSubDir: parts.length > 2 });
+      } else {
+        const info = firstLevelMap.get(first);
+        if (parts.length > 1) info.isDir = true;
+        if (parts.length > 2) info.hasSubDir = true;
+      }
+    }
+
+    const entries = Array.from(firstLevelMap.values());
+    const hasFiles = entries.some(e => !e.isDir);
+    const hasDirs = entries.some(e => e.isDir);
+    const hasSubDirs = entries.some(e => e.hasSubDir);
+
+    if (hasFiles) {
+      // inputDir 下直接有图片文件
+      return { type: 'root-files' };
+    }
+
+    if (hasDirs && !hasSubDirs) {
+      // inputDir 下全是子目录，且子目录下直接是图片 → inputDir 本身是模块
+      return {
+        type: 'module-dir',
+        moduleName: path.basename(this.inputDir)
+      };
+    }
+
+    // 默认：标准两级结构或无法识别
+    return { type: 'nested' };
   }
 
   // 名称映射：中文目录名 -> 英文
