@@ -99,8 +99,11 @@ export class ApiClient {
     // 获取设计图实际像素宽度（由 Scanner 自动检测）
     const actualImageWidth = pageGroup.actualImageWidth;
 
+    // 获取图片倍数标记（如 @3x），用于计算设计稿实际标注宽度
+    const imageScale = pageGroup.states[0]?.scale || 1;
+
     // 构建提示词
-    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0, actualImageWidth);
+    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0, actualImageWidth, imageScale);
 
     const content = [
       { type: 'text', text: prompt },
@@ -122,7 +125,7 @@ export class ApiClient {
     return codeMatch ? codeMatch[1].trim() : resultText;
   }
 
-  buildPrompt(uiConfig, designWidth, hasCutImages, actualImageWidth = null) {
+  buildPrompt(uiConfig, designWidth, hasCutImages, actualImageWidth = null, imageScale = 1) {
     const presetCfg = this.preset.get();
     const customRules = this.preset.getPromptRules();
 
@@ -151,7 +154,13 @@ export class ApiClient {
 当前项目设计稿基准：**${designWidth}px**`;
 
     // 自动计算并注入 px 倍数规则
-    const pxScaleRule = this.buildPxScaleRule(actualImageWidth, presetCfg.rootValue, customRules);
+    const pxScaleRule = this.buildPxScaleRule(
+      actualImageWidth,
+      presetCfg.rootValue,
+      customRules,
+      imageScale,
+      uiConfig.template === 'mobile'
+    );
     if (pxScaleRule) {
       prompt += `\n\n## 尺寸转换规则（重要）\n${pxScaleRule}`;
     }
@@ -253,17 +262,41 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
   /**
    * 构建 px 尺寸转换规则
    * 根据设计图实际宽度和项目 rootValue 自动计算倍数
+   *
+   * 区分 PC 和 H5：
+   * - H5（mobile）：使用 amfe-flexible + postcss-pxtorem，需要 rootValue 计算倍数
+   * - PC（非 mobile）：直接使用设计稿标注宽度，不需要 px 转换
+   *
+   * 支持 @2x/@3x 图片：图片实际像素宽度 ÷ 图片倍数 = 设计稿标注宽度
+   *
    * @param {number|null} actualImageWidth - 图片实际像素宽度
    * @param {number} rootValue - postcss-pxtorem 的 rootValue
    * @param {string[]} customRules - 已有的自定义规则（用于去重检测）
+   * @param {number} imageScale - 图片倍数标记（如 @3x 的 3，默认 1）
+   * @param {boolean} isMobile - 是否为移动端项目（H5）
    * @returns {string|null} 转换规则文本，无需转换时返回 null
    */
-  buildPxScaleRule(actualImageWidth, rootValue, customRules = []) {
-    if (!actualImageWidth || !rootValue || rootValue <= 0) return null;
+  buildPxScaleRule(actualImageWidth, rootValue, customRules = [], imageScale = 1, isMobile = true) {
+    if (!actualImageWidth || actualImageWidth <= 0) return null;
+
+    // 设计稿标注宽度 = 图片实际像素宽度 ÷ 图片倍数
+    const designDraftWidth = Math.round(actualImageWidth / imageScale);
+
+    // PC 项目：直接使用设计稿标注宽度，不需要转换
+    if (!isMobile) {
+      // 如果图片有倍数标记，提示按标注尺寸输出
+      if (imageScale > 1) {
+        return `图片为 @${imageScale}x（${actualImageWidth}px），设计稿标注宽度为 ${designDraftWidth}px。请按设计稿标注尺寸直接输出 px 值。`;
+      }
+      return null;
+    }
+
+    // H5 项目：使用 postcss-pxtorem 逻辑
+    if (!rootValue || rootValue <= 0) return null;
 
     // 项目设计标准宽度 = rootValue * 10（amfe-flexible 设 html font-size = deviceWidth/10）
     const projectStandard = rootValue * 10;
-    const scale = projectStandard / actualImageWidth;
+    const scale = projectStandard / designDraftWidth;
 
     // 无需转换的情况（倍数接近 1）
     if (Math.abs(scale - 1) < 0.05) return null;
@@ -279,7 +312,13 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
 
     const scaleText = scale % 1 === 0 ? String(scale) : scale.toFixed(2);
 
-    return `设计图实际宽度为 ${actualImageWidth}px，但项目使用 ${projectStandard}px 设计稿标准（postcss-pxtorem rootValue: ${rootValue}）。请将所有视觉测量的尺寸（width、height、padding、margin、font-size、line-height、border-radius、gap 等）乘以 ${scaleText} 后再输出 px 值，例如图片上测量为 100px 的元素，代码中写 ${Math.round(100 * scale)}px`;
+    let rule = `设计图实际宽度为 ${designDraftWidth}px`;
+    if (imageScale > 1) {
+      rule += `（原始图片 ${actualImageWidth}px，@${imageScale}x）`;
+    }
+    rule += `，但项目使用 ${projectStandard}px 设计稿标准（postcss-pxtorem rootValue: ${rootValue}）。请将所有视觉测量的尺寸（width、height、padding、margin、font-size、line-height、border-radius、gap 等）乘以 ${scaleText} 后再输出 px 值，例如图片上测量为 100px 的元素，代码中写 ${Math.round(100 * scale)}px`;
+
+    return rule;
   }
 
   async callClaudeAPI(content) {
