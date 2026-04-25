@@ -205,12 +205,14 @@ export class ApiClient {
       prompt += `\n- 布局统一使用 \`${presetCfg.layoutComponent}\` 组件包裹，不要自己写导航栏`;
     }
 
-    // 工具函数
-    if (presetCfg.useToastUtil) {
-      prompt += `\n- toast 使用 \`toast.show("消息")\` 而不是 Vant 的 showToast`;
+    // 工具函数（toast / confirm）
+    const toastPrompt = this.preset.getToastPrompt ? this.preset.getToastPrompt() : null;
+    const confirmPrompt = this.preset.getConfirmPrompt ? this.preset.getConfirmPrompt() : null;
+    if (toastPrompt) {
+      prompt += `\n- ${toastPrompt}`;
     }
-    if (presetCfg.useDialogUtil) {
-      prompt += `\n- dialog 使用 \`dialog.confirm("标题", "内容")\` 而不是 Vant 的 showConfirmDialog`;
+    if (confirmPrompt) {
+      prompt += `\n- ${confirmPrompt}`;
     }
 
     // 组件导入模式

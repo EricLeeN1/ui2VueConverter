@@ -12,6 +12,49 @@ import path from 'path';
  * 2. 完全自定义（不写 preset 字段）：直接写完整配置对象
  */
 
+/**
+ * 内置 toast 映射表
+ * key: van | el | antd | custom | none
+ */
+const TOAST_PRESETS = {
+  van: {
+    import: "import { showToast, showSuccessToast, showFailToast } from 'vant'",
+    info: 'showToast("{message}")',
+    success: 'showSuccessToast("{message}")',
+    error: 'showFailToast("{message}")'
+  },
+  el: {
+    import: "import { ElMessage } from 'element-plus'",
+    info: 'ElMessage({ message: "{message}", type: "info" })',
+    success: 'ElMessage({ message: "{message}", type: "success" })',
+    error: 'ElMessage({ message: "{message}", type: "error" })'
+  },
+  antd: {
+    import: "import { message } from 'ant-design-vue'",
+    info: 'message.info("{message}")',
+    success: 'message.success("{message}")',
+    error: 'message.error("{message}")'
+  }
+};
+
+/**
+ * 内置 confirm 映射表
+ */
+const CONFIRM_PRESETS = {
+  van: {
+    import: "import { showConfirmDialog } from 'vant'",
+    call: 'showConfirmDialog({ title: "{title}", message: "{message}" })'
+  },
+  el: {
+    import: "import { ElMessageBox } from 'element-plus'",
+    call: 'ElMessageBox.confirm("{message}", "{title}")'
+  },
+  antd: {
+    import: "import { Modal } from 'ant-design-vue'",
+    call: 'Modal.confirm({ title: "{title}", content: "{message}" })'
+  }
+};
+
 const PRESETS = {
   default: {
     name: 'default',
@@ -27,8 +70,15 @@ const PRESETS = {
     fileNaming: 'pascal',
     outputStructure: 'nested',
     useBasePages: false,
-    useToastUtil: false,
-    useDialogUtil: false,
+    // toast / confirm 配置（新）
+    // 可选值: van | el | antd | custom | none
+    // 兼容旧配置: useToastUtil / useDialogUtil
+    toast: 'van',
+    confirm: 'van',
+    customToastImport: '',
+    customToastCall: '',
+    customConfirmImport: '',
+    customConfirmCall: '',
     customImports: [],
     customPromptRules: [],
     nameMap: {}
@@ -76,6 +126,18 @@ export class PresetConfig {
     const baseRules = basePreset.customPromptRules || [];
     const fileRules = fileConfig.customPromptRules || fileConfig.customPrompt || [];
     this.config.customPromptRules = [...baseRules, ...fileRules];
+
+    // 6. 兼容旧配置 useToastUtil / useDialogUtil
+    if (fileConfig.useToastUtil === true && !fileConfig.toast) {
+      this.config.toast = 'custom';
+      this.config.customToastImport = fileConfig.customToastImport || '';
+      this.config.customToastCall = fileConfig.customToastCall || 'toast.show("{message}")';
+    }
+    if (fileConfig.useDialogUtil === true && !fileConfig.confirm) {
+      this.config.confirm = 'custom';
+      this.config.customConfirmImport = fileConfig.customConfirmImport || '';
+      this.config.customConfirmCall = fileConfig.customConfirmCall || 'dialog.confirm("{title}", "{message}")';
+    }
   }
 
   loadConfigFile(configPath = null) {
@@ -150,5 +212,45 @@ export class PresetConfig {
       name: key,
       description: PRESETS[key].description
     }));
+  }
+
+  /**
+   * 获取 toast 的 prompt 提示文本
+   * @returns {string|null}
+   */
+  getToastPrompt() {
+    const cfg = this.config;
+    const type = cfg.toast;
+    if (!type || type === 'none') return null;
+
+    if (type === 'custom') {
+      if (!cfg.customToastCall) return null;
+      const importLine = cfg.customToastImport ? `，import：\`${cfg.customToastImport}\`` : '';
+      return `- toast 使用 \`${cfg.customToastCall.replace('{message}', '消息')}\`${importLine}`;
+    }
+
+    const preset = TOAST_PRESETS[type];
+    if (!preset) return null;
+    return `- toast 使用 \`${preset.info.replace('{message}', '消息')}\`，import：\`${preset.import}\``;
+  }
+
+  /**
+   * 获取 confirm 的 prompt 提示文本
+   * @returns {string|null}
+   */
+  getConfirmPrompt() {
+    const cfg = this.config;
+    const type = cfg.confirm;
+    if (!type || type === 'none') return null;
+
+    if (type === 'custom') {
+      if (!cfg.customConfirmCall) return null;
+      const importLine = cfg.customConfirmImport ? `，import：\`${cfg.customConfirmImport}\`` : '';
+      return `- confirm/dialog 使用 \`${cfg.customConfirmCall.replace('{title}', '标题').replace('{message}', '内容')}\`${importLine}`;
+    }
+
+    const preset = CONFIRM_PRESETS[type];
+    if (!preset) return null;
+    return `- confirm/dialog 使用 \`${preset.call.replace('{title}', '标题').replace('{message}', '内容')}\`，import：\`${preset.import}\``;
   }
 }
