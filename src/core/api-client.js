@@ -32,9 +32,13 @@ export class ApiClient {
     const presetCfg = this.preset.get();
     const designWidth = presetCfg.designWidth || uiConfig.designWidth || 375;
 
+    // 统一模板名称大小写，支持 mobile/Mobile/MOBILE/pc/PC/Pc 等
+    const template = (uiConfig.template || 'mobile').toLowerCase();
+    const isMobile = template === 'mobile';
+
     // 处理所有截图，转换为base64
     const imageContents = [];
-    const targetWidth = uiConfig.template === 'mobile' ? 800 : 1500;
+    const targetWidth = isMobile ? 800 : 1500;
 
     for (const state of pageGroup.states) {
       const scale = state.scale || 1;
@@ -103,7 +107,7 @@ export class ApiClient {
     const imageScale = pageGroup.states[0]?.scale || 1;
 
     // 构建提示词
-    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0, actualImageWidth, imageScale);
+    const prompt = this.buildPrompt(uiConfig, designWidth, cutImageContents.length > 0, actualImageWidth, imageScale, isMobile);
 
     const content = [
       { type: 'text', text: prompt },
@@ -125,7 +129,7 @@ export class ApiClient {
     return codeMatch ? codeMatch[1].trim() : resultText;
   }
 
-  buildPrompt(uiConfig, designWidth, hasCutImages, actualImageWidth = null, imageScale = 1) {
+  buildPrompt(uiConfig, designWidth, hasCutImages, actualImageWidth = null, imageScale = 1, isMobile = true) {
     const presetCfg = this.preset.get();
     const customRules = this.preset.getPromptRules();
 
@@ -159,7 +163,7 @@ export class ApiClient {
       presetCfg.rootValue,
       customRules,
       imageScale,
-      uiConfig.template === 'mobile'
+      isMobile
     );
     if (pxScaleRule) {
       prompt += `\n\n## 尺寸转换规则（重要）\n${pxScaleRule}`;
@@ -192,7 +196,7 @@ export class ApiClient {
     }
 
     // 尺寸单位说明
-    if (uiConfig.template === 'mobile' && presetCfg.rootValue) {
+    if (isMobile && presetCfg.rootValue) {
       prompt += `\n- 移动端项目，使用 px 单位，最终通过 postcss-pxtorem (rootValue: ${presetCfg.rootValue}) 转换为 rem`;
     }
     prompt += `\n\n**所有尺寸单位使用 px**`;
@@ -226,7 +230,7 @@ export class ApiClient {
     prompt += `\n
 ## 技术规范
 - Vue 3 Composition API + ${presetCfg.useTypeScript ? '<script setup lang="ts">' : '<script setup>'}
-- ${uiConfig.template === 'mobile' ? '移动端优先' : 'PC端'}
+- ${isMobile ? '移动端优先' : 'PC端'}
 - <style scoped> 只放无法用原子类表达的复杂样式（如动画、伪元素）`;
 
     // 自定义规则（来自配置文件）
