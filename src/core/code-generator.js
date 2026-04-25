@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import prettier from 'prettier';
 import { ApiClient } from './api-client.js';
+import { SyntaxFixer } from './syntax-fix.js';
 
 export class CodeGenerator {
   constructor(options) {
@@ -44,6 +45,16 @@ export class CodeGenerator {
 
       // 调整 script/style 标签
       code = this.adjustTags(code);
+
+      // 自动修复 CSS 语法错误（花括号匹配、style 标签闭合）
+      const fixResult = SyntaxFixer.fixVueCode(code);
+      if (fixResult.fixed) {
+        code = fixResult.code;
+        SyntaxFixer.printReport(fixResult.report);
+      }
+
+      // 清理冗余导入
+      code = this.dedupeImports(code);
 
       // 格式化代码（出错时跳过）
       try {
@@ -158,6 +169,88 @@ ${styleTag}
     code = code.replace(/<style scoped lang="css">/, styleTag);
 
     return code;
+  }
+
+  /**
+   * 清理冗余导入
+   * 检测目标项目是否配置了 auto-import，如果是则删除对应的 import 语句
+   */
+  dedupeImports(code) {
+    // 从输出目录向上查找项目根目录（包含 package.json）
+    const projectRoot = this.findProjectRoot(this.outputDir);
+    if (!projectRoot) return code;
+
+    let cleaned = code;
+    const removed = [];
+
+    // 检查 auto-imports.d.ts
+    const hasAutoImport = fs.existsSync(path.join(projectRoot, 'auto-imports.d.ts'));
+    if (hasAutoImport) {
+      // 删除 from 'vue' / from 'vue-router' 的 import
+      const autoImportPatterns = [
+        // import { ref, computed } from 'vue'
+        /import\s+\{[^}]+\}\s+from\s+['"]vue['"]\s*;?\n/g,
+        // import { useRoute } from 'vue-router'
+        /import\s+\{[^}]+\}\s+from\s+['"]vue-router['"]\s*;?\n/g,
+      ];
+      for (const pattern of autoImportPatterns) {
+        cleaned = cleaned.replace(pattern, (match) => {
+          removed.push(match.trim());
+          return '';
+        });
+      }
+    }
+
+    // 检查 components.d.ts（通常由 unplugin-vue-components 生成）
+    const hasComponentResolver = fs.existsSync(path.join(projectRoot, 'components.d.ts'));
+    if (hasComponentResolver) {
+      // 删除 from 'vant' 的组件导入（保留非组件导入如 showToast）
+      // 注意：只删除大驼峰命名的组件导入，保留函数/工具导入
+      cleaned = cleaned.replace(
+        /import\s+\{([^}]+)\}\s+from\s+['"]vant['"]\s*;?\n/g,
+        (match, importsBlock) => {
+          // 分离组件导入和函数导入
+          const items = importsBlock.split(',').map(s => s.trim()).filter(Boolean);
+          const componentImports = items.filter(item => /^[A-Z]/.test(item));
+          const funcImports = items.filter(item => !/^[A-Z]/.test(item));
+
+          if (componentImports.length > 0) {
+            removed.push(`import { ${componentImports.join(', ')} } from 'vant'`);
+          }
+
+          if (funcImports.length > 0) {
+            return `import { ${funcImports.join(', ')} } from 'vant'\n`;
+          }
+          return '';
+        }
+      );
+    }
+
+    if (removed.length > 0) {
+      console.log(`\n🧹 已清理 ${removed.length} 个冗余 import：`);
+      for (const imp of removed) {
+        console.log(`  - ${imp}`);
+      }
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * 从输出目录向上查找项目根目录
+   */
+  findProjectRoot(dir) {
+    let current = path.resolve(dir);
+    const maxDepth = 10;
+    for (let i = 0; i < maxDepth; i++) {
+      if (fs.existsSync(path.join(current, 'package.json'))) {
+        return current;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return null;
   }
 
   async generateRouterFile(routes) {
