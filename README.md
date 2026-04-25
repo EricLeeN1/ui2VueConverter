@@ -16,6 +16,7 @@
 - ✅ 自动识别并抽离公共组件，减少重复代码
 - ✅ **支持设计切图/素材，生成更精准的UI还原**
 - ✅ 生成符合规范的Vue 3 Composition API代码
+- ✅ **支持 Preset 预设配置，可按项目自定义输出规范**
 - ✅ 自动生成路由配置
 - ✅ 生成代码自动格式化
 
@@ -54,6 +55,73 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
 - `--ui`: UI库选择，支持`vant`/`element-plus`/`antd-vue`，默认`vant`
 - `--output`: 输出目录，默认`./src`
 - `--config`: 配置文件路径，默认`./.ui-to-vue.config.json`
+- `--preset`: 配置预设，默认`default`
+
+## Preset 预设配置（新功能 v1.1.0）
+
+工具支持通过 `.ui-to-vue.config.json` 配置文件自定义项目规范，无需修改工具源码。
+
+### 配置文件示例
+
+```json
+{
+  "preset": "default",
+  "useTypeScript": true,
+  "styleLang": "scss",
+  "useUnoCSS": false,
+  "designWidth": 750,
+  "rootValue": 75,
+  "layoutComponent": "BasePages",
+  "componentImportMode": "auto",
+  "fileNaming": "kebab",
+  "outputStructure": "flat",
+  "customImports": [
+    "import toast from '@/utils/toast'",
+    "import dialog from '@/utils/dialog'"
+  ],
+  "customPromptRules": [
+    "项目使用 TypeScript，`<script setup lang=\"ts\">`",
+    "样式使用 SCSS（`<style scoped lang=\"scss\">`），不使用 UnoCSS 原子类",
+    "所有尺寸使用 px 单位，设计稿基准 750px",
+    "布局统一使用 BasePages 组件包裹",
+    "toast 使用 `toast.show(\"消息\")`"
+  ],
+  "nameMap": {
+    "公文拟制": "document-drafts",
+    "待处理": "pending"
+  }
+}
+```
+
+### 配置项说明
+
+| 配置项 | 类型 | 说明 |
+|--------|------|------|
+| `useTypeScript` | boolean | 是否生成 TypeScript 代码 |
+| `styleLang` | string | 样式语言：`css`/`scss`/`less` |
+| `useUnoCSS` | boolean | 是否使用 UnoCSS 原子类 |
+| `designWidth` | number | 设计稿基准宽度（如 375/750） |
+| `rootValue` | number | postcss-pxtorem 的 rootValue |
+| `layoutComponent` | string | 布局组件名，如 `BasePages` |
+| `fileNaming` | string | 文件名风格：`pascal` 或 `kebab` |
+| `outputStructure` | string | 输出结构：`nested` 或 `flat` |
+| `customImports` | string[] | 额外导入的模块 |
+| `customPromptRules` | string[] | 自定义 AI Prompt 规则 |
+| `nameMap` | object | 中文目录名映射为英文 |
+
+### nameMap 名称映射
+
+当设计图目录使用中文命名时，可通过 `nameMap` 自动映射为英文文件名：
+
+```json
+{
+  "nameMap": {
+    "公文拟制": "document-drafts",
+    "待处理": "pending",
+    "已处理": "processed"
+  }
+}
+```
 
 ## 路径模式说明
 所有路径参数**同时支持相对路径和绝对路径**：
