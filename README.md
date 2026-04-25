@@ -87,7 +87,7 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
     "toast 使用 `toast.show(\"消息\")`"
   ],
   "nameMap": {
-    "公文拟制": "document-drafts",
+    "示例页面": "example-page",
     "待处理": "pending"
   }
 }
@@ -116,7 +116,7 @@ ui-to-vue --input ./screenshots --ui vant --output ./src
 ```json
 {
   "nameMap": {
-    "公文拟制": "document-drafts",
+    "示例页面": "example-page",
     "待处理": "pending",
     "已处理": "processed"
   }

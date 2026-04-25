@@ -16,6 +16,7 @@ One-click batch conversion of UI design screenshots (LanHu, Figma, etc.) to Vue 
 - ✅ Auto-detect and extract public components, reduce duplicate code
 - ✅ **Support design cut images/assets for more accurate UI restoration**
 - ✅ Generate Vue 3 Composition API compliant code
+- ✅ **Support Preset configuration for project-specific output standards**
 - ✅ Auto-generate router configuration
 - ✅ Auto-format generated code
 
@@ -65,6 +66,73 @@ claude plugin install ui-to-vue@ui-to-vue-marketplace
 | `--ui` | UI library: vant/element-plus/antd-vue | `vant` |
 | `--output` | Output directory | `./src` |
 | `--config` | Config file path | `./.ui-to-vue.config.json` |
+| `--preset` | Configuration preset | `default` |
+
+## Preset Configuration (New in v1.1.0)
+
+The tool supports customizing project standards via `.ui-to-vue.config.json` configuration file, without modifying the tool source code.
+
+### Config File Example
+
+```json
+{
+  "preset": "default",
+  "useTypeScript": true,
+  "styleLang": "scss",
+  "useUnoCSS": false,
+  "designWidth": 750,
+  "rootValue": 75,
+  "layoutComponent": "BasePages",
+  "componentImportMode": "auto",
+  "fileNaming": "kebab",
+  "outputStructure": "flat",
+  "customImports": [
+    "import toast from '@/utils/toast'",
+    "import dialog from '@/utils/dialog'"
+  ],
+  "customPromptRules": [
+    "Project uses TypeScript, `<script setup lang=\"ts\">`",
+    "Styles use SCSS (`<style scoped lang=\"scss\">`), do not use UnoCSS atomic classes",
+    "All dimensions use px unit, design draft baseline 750px",
+    "Layout wrapped uniformly with BasePages component",
+    "toast uses `toast.show(\"message\")`"
+  ],
+  "nameMap": {
+    "Example Page": "example-page",
+    "Pending": "pending"
+  }
+}
+```
+
+### Config Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `useTypeScript` | boolean | Generate TypeScript code |
+| `styleLang` | string | Style language: `css`/`scss`/`less` |
+| `useUnoCSS` | boolean | Use UnoCSS atomic classes |
+| `designWidth` | number | Design draft baseline width (e.g. 375/750) |
+| `rootValue` | number | postcss-pxtorem rootValue |
+| `layoutComponent` | string | Layout component name, e.g. `BasePages` |
+| `fileNaming` | string | File naming style: `pascal` or `kebab` |
+| `outputStructure` | string | Output structure: `nested` or `flat` |
+| `customImports` | string[] | Additional import modules |
+| `customPromptRules` | string[] | Custom AI Prompt rules |
+| `nameMap` | object | Map Chinese directory names to English |
+
+### nameMap Name Mapping
+
+When design directories use Chinese names, `nameMap` can automatically map them to English file names:
+
+```json
+{
+  "nameMap": {
+    "Example Page": "example-page",
+    "Pending": "pending",
+    "Processed": "processed"
+  }
+}
+```
 
 ## Path Modes
 
