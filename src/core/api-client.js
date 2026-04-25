@@ -1,8 +1,7 @@
 import fs from 'fs-extra';
 import sharp from 'sharp';
 import path from 'path';
-
-const CLAUDE_API_URL = 'https://coding.dashscope.aliyuncs.com/apps/anthropic/v1/messages';
+import { createProvider } from './providers/index.js';
 
 export class ApiClient {
   constructor(apiKey = null, presetConfig = null) {
@@ -10,12 +9,12 @@ export class ApiClient {
     const config = this.preset.get();
 
     // API Key 优先级：传入 > 配置 > 环境变量
-    this.apiKey = apiKey
+    const resolvedKey = apiKey
       || config.apiKey
       || process.env.UI_TO_VUE_API_KEY
       || process.env.DASHSCOPE_API_KEY;
 
-    if (!this.apiKey) {
+    if (!resolvedKey) {
       throw new Error(
         '未配置 API Key，请通过以下方式设置：\n' +
         '1. 配置文件 .ui-to-vue.config.json 的 apiKey 字段\n' +
@@ -24,8 +23,14 @@ export class ApiClient {
       );
     }
 
-    this.provider = config.provider || 'dashscope';
-    this.model = config.model || 'qwen3.6-plus';
+    // 创建 Provider 实例
+    this.provider = createProvider({
+      provider: config.provider || 'anthropic',
+      url: config.url,
+      apiKey: resolvedKey,
+      model: config.model || 'qwen3.6-plus',
+      apiVersion: config.apiVersion
+    });
   }
 
   async generateVueCode(pageGroup, uiConfig) {
@@ -116,7 +121,7 @@ export class ApiClient {
     ];
 
     // 调用 API
-    const response = await this.callClaudeAPI(content);
+    const response = await this.provider.chat(content);
 
     // 提取代码
     let resultText = '';
@@ -332,35 +337,4 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
     return rule;
   }
 
-  async callClaudeAPI(content) {
-    const headers = {
-      'x-api-key': this.apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    };
-
-    const body = {
-      model: this.model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: 'user',
-          content: content
-        }
-      ]
-    };
-
-    const response = await fetch(CLAUDE_API_URL, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API调用失败: ${response.status} - ${errorText}`);
-    }
-
-    return response.json();
-  }
 }
