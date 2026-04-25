@@ -20,6 +20,7 @@ const PRESETS = {
     styleLang: 'css',
     useUnoCSS: true,
     designWidth: 375,
+    projectStandardWidth: null,  // 项目设计标准宽度（如 750px），默认等于 designWidth
     rootValue: 37.5,
     layoutComponent: null,
     componentImportMode: 'full',

@@ -160,7 +160,6 @@ export class ApiClient {
     // 自动计算并注入 px 倍数规则
     const pxScaleRule = this.buildPxScaleRule(
       actualImageWidth,
-      presetCfg.rootValue,
       customRules,
       imageScale,
       isMobile
@@ -280,26 +279,32 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
    * @param {boolean} isMobile - 是否为移动端项目（H5）
    * @returns {string|null} 转换规则文本，无需转换时返回 null
    */
-  buildPxScaleRule(actualImageWidth, rootValue, customRules = [], imageScale = 1, isMobile = true) {
+  buildPxScaleRule(actualImageWidth, customRules = [], imageScale = 1, isMobile = true) {
     if (!actualImageWidth || actualImageWidth <= 0) return null;
 
     // 设计稿标注宽度 = 图片实际像素宽度 ÷ 图片倍数
     const designDraftWidth = Math.round(actualImageWidth / imageScale);
 
-    // PC 项目：直接使用设计稿标注宽度，不需要转换
+    // ── PC 项目 ──
+    // PC 按 1920×1080 标准输出，无需 px 转换
     if (!isMobile) {
-      // 如果图片有倍数标记，提示按标注尺寸输出
       if (imageScale > 1) {
         return `图片为 @${imageScale}x（${actualImageWidth}px），设计稿标注宽度为 ${designDraftWidth}px。请按设计稿标注尺寸直接输出 px 值。`;
       }
       return null;
     }
 
-    // H5 项目：使用 postcss-pxtorem 逻辑
-    if (!rootValue || rootValue <= 0) return null;
+    // ── H5 项目 ──
+    // H5 以 375px 为逻辑基准，@1x=375 / @2x=750 / @3x=1125，逻辑宽度始终是 375px
+    // 项目可能按 750px 标准配置（rootValue=75），需要告诉 AI 转换倍数
+    const presetCfg = this.preset.get();
 
-    // 项目设计标准宽度 = rootValue * 10（amfe-flexible 设 html font-size = deviceWidth/10）
-    const projectStandard = rootValue * 10;
+    // 项目设计标准宽度：优先用配置项，其次按 rootValue*10 推导
+    const projectStandard = presetCfg.projectStandardWidth
+      || (presetCfg.rootValue ? presetCfg.rootValue * 10 : null);
+
+    if (!projectStandard || projectStandard <= 0) return null;
+
     const scale = projectStandard / designDraftWidth;
 
     // 无需转换的情况（倍数接近 1）
@@ -320,7 +325,7 @@ ${JSON.stringify(uiConfig.componentMap, null, 2)}`;
     if (imageScale > 1) {
       rule += `（原始图片 ${actualImageWidth}px，@${imageScale}x）`;
     }
-    rule += `，但项目使用 ${projectStandard}px 设计稿标准（postcss-pxtorem rootValue: ${rootValue}）。请将所有视觉测量的尺寸（width、height、padding、margin、font-size、line-height、border-radius、gap 等）乘以 ${scaleText} 后再输出 px 值，例如图片上测量为 100px 的元素，代码中写 ${Math.round(100 * scale)}px`;
+    rule += `，但项目使用 ${projectStandard}px 设计稿标准（postcss-pxtorem rootValue: ${presetCfg.rootValue}）。请将所有视觉测量的尺寸（width、height、padding、margin、font-size、line-height、border-radius、gap 等）乘以 ${scaleText} 后再输出 px 值，例如图片上测量为 100px 的元素，代码中写 ${Math.round(100 * scale)}px`;
 
     return rule;
   }
